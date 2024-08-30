@@ -22,6 +22,10 @@ device = get_torch_device()
 model_input_size = [1024,1024]
 
 class BriaaiRembg:
+
+    def __init__(self) -> None:
+        self.model = None
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -40,16 +44,17 @@ class BriaaiRembg:
 
 
     def matting(self, video_frames, version, fp16, bg_color, batch_size, **kwargs):
-        model_path = load_file_from_url(download_url, file_name=f"briaai_rmbg_{version}.pth", model_dir=CKPTS_PATH)
-        model = BriaRMBG()
-        model.load_state_dict(torch.load(model_path, map_location="cpu"))
-        model.to(device).eval()
+        if self.model == None:
+            model_path = load_file_from_url(download_url, file_name=f"briaai_rmbg_{version}.pth", model_dir=CKPTS_PATH)
+            self.model = BriaRMBG()
+            self.model.load_state_dict(torch.load(model_path, map_location="cpu"))
+            self.model.to(device).eval()
 
         video_frames, orig_num_frames, bg_color = prepare_frames_color(video_frames, bg_color, batch_size)
         bg_color = bg_color.to(device)
         orig_frame_size = video_frames.shape[2:4]
         if fp16:
-            model.half()
+            self.model.half()
             bg_color.half()
         
         fgrs, masks = [], []
@@ -61,7 +66,7 @@ class BriaaiRembg:
             resized_input = F.interpolate(resized_input, size=model_input_size, mode='bilinear')
             resized_input = normalize(resized_input,[0.5,0.5,0.5],[1.0,1.0,1.0])
 
-            mask = model(resized_input)[0][0]
+            mask = self.model(resized_input)[0][0]
             mask = (mask-mask.min())/(mask.max()-mask.min())
             mask = F.interpolate(mask, size=orig_frame_size)
 
